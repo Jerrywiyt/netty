@@ -623,39 +623,42 @@ public class SslHandler extends ByteToMessageDecoder implements ChannelOutboundH
 
     /**
      * Sends an SSL {@code close_notify} message to the specified channel and
-     * destroys the underlying {@link SSLEngine}.
-     *
-     * @deprecated use {@link Channel#close()} or {@link ChannelHandlerContext#close()}
+     * destroys the underlying {@link SSLEngine}. This will <strong>not</strong> close the underlying
+     * {@link Channel}. If you want to also close the {@link Channel} use {@link Channel#close()} or
+     * {@link ChannelHandlerContext#close()}
      */
-    @Deprecated
     public ChannelFuture close() {
         return close(ctx.newPromise());
     }
 
     /**
      * See {@link #close()}
-     *
-     * @deprecated use {@link Channel#close()} or {@link ChannelHandlerContext#close()}
      */
-    @Deprecated
     public ChannelFuture close(final ChannelPromise promise) {
         final ChannelHandlerContext ctx = this.ctx;
-        ctx.executor().execute(new Runnable() {
-            @Override
-            public void run() {
-                outboundClosed = true;
-                engine.closeOutbound();
-                try {
-                    flush(ctx, promise);
-                } catch (Exception e) {
-                    if (!promise.tryFailure(e)) {
-                        logger.warn("{} flush() raised a masked exception.", ctx.channel(), e);
-                    }
+        if (ctx.executor().inEventLoop()) {
+            close0(promise);
+        } else {
+            ctx.executor().execute(new Runnable() {
+                @Override
+                public void run() {
+                    close0(promise);
                 }
-            }
-        });
-
+            });
+        }
         return promise;
+    }
+
+    private void close0(ChannelPromise promise) {
+        outboundClosed = true;
+        engine.closeOutbound();
+        try {
+            flush(ctx, promise);
+        } catch (Exception e) {
+            if (!promise.tryFailure(e)) {
+                logger.warn("{} flush() raised a masked exception.", ctx.channel(), e);
+            }
+        }
     }
 
     /**
