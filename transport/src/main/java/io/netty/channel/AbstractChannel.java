@@ -501,7 +501,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
-                doRegister();
+                doRegister();//不抛异常就证明注册成功了。
                 neverRegistered = false;
                 registered = true;
 

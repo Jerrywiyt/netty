@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-
+//Promise的作用就是结果通知，类似Future，但是Promise可以通过外部设置结果成功或者失败。
 public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultPromise.class);
     private static final InternalLogger rejectedExecutionLogger =
@@ -214,6 +214,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
 
     @Override
     public Promise<V> await() throws InterruptedException {
+        //任务完成直接返回自身
         if (isDone()) {
             return this;
         }
@@ -226,10 +227,13 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
 
         synchronized (this) {
             while (!isDone()) {
+                //将waiter数+1
                 incWaiters();
                 try {
+                    //等待，等待被notifyAll唤醒。
                     wait();
                 } finally {
+                    //减少waiter数
                     decWaiters();
                 }
             }
@@ -389,6 +393,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         return executor;
     }
 
+    //如果是同一个线程的话，前面执行了wait方法，后面这个线程就没有机会执行notifyAll方法了，造成了线程假死，所以很有必要进行死锁判断。
     protected void checkDeadLock() {
         EventExecutor e = executor();
         if (e != null && e.inEventLoop()) {
@@ -413,6 +418,8 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         notifyListenerWithStackOverFlowProtection(eventExecutor, future, listener);
     }
 
+
+    //执行listener。可以看出来，所有的listener都是由Promise所在线程池执行的。
     private void notifyListeners() {
         EventExecutor executor = executor();
         if (executor.inEventLoop()) {
@@ -541,7 +548,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     private boolean setFailure0(Throwable cause) {
         return setValue0(new CauseHolder(checkNotNull(cause, "cause")));
     }
-
+    //成功后调用notifyAll
     private boolean setValue0(Object objResult) {
         if (RESULT_UPDATER.compareAndSet(this, null, objResult) ||
             RESULT_UPDATER.compareAndSet(this, UNCANCELLABLE, objResult)) {

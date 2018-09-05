@@ -104,6 +104,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         return config;
     }
 
+    //判断本地端口是否绑定成功。
     @Override
     public boolean isActive() {
         return javaChannel().socket().isBound();
@@ -138,6 +139,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         javaChannel().close();
     }
 
+    //接收客户端的连接，并创建NioSocketChannel对象。
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
         SocketChannel ch = SocketUtils.accept(javaChannel());

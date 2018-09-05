@@ -122,6 +122,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         }
     }
 
+    //功能类似AbstractNioByteChannel的write方法，只不过此方法操作的是对象。
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         final SelectionKey key = selectionKey();

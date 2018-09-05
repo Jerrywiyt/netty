@@ -311,6 +311,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
         try {
             boolean connected = SocketUtils.connect(javaChannel(), remoteAddress);
             if (!connected) {
+                //nio的特性，连接是异步的，调用当时不一定连接成功，如果没有连接成功，需要把连接事件注册到selector上。
                 selectionKey().interestOps(SelectionKey.OP_CONNECT);
             }
             success = true;
@@ -401,6 +402,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                     // Zero length buffers are not added to nioBuffers by ChannelOutboundBuffer, so there is no need
                     // to check if the total size of all the buffers is non-zero.
                     ByteBuffer buffer = nioBuffers[0];
+                    // 表示剩余的发送字节数。
                     int attemptedBytes = buffer.remaining();
                     final int localWrittenBytes = ch.write(buffer);
                     if (localWrittenBytes <= 0) {

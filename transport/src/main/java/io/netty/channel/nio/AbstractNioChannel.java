@@ -386,6 +386,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
+                //如果selectionkey 被cancel，会抛出CancelledKeyException。调用selector.selectNow会移除无效的key。下次注册理论上会成功，如果注销的key还被缓存的话，那么可能就是JDK bug。
                 if (!selected) {
                     // Force the Selector to select now as the "canceled" SelectionKey may still be
                     // cached and not removed because no Select.select(..) operation was called yet.

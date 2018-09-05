@@ -216,7 +216,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 in.remove();
                 return 0;
             }
-
+//          每次写入一定数量的数据，有可能写入0长度，如果一个buf中的数据写完了之后就删除。
             final int localFlushedAmount = doWriteBytes(buf);
             if (localFlushedAmount > 0) {
                 in.progress(localFlushedAmount);
@@ -244,11 +244,13 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             // Should not reach here.
             throw new Error();
         }
+        //如果执行到这的话表示TCP缓冲区已经满了，发生了ZERO_WINDOW，会退出写循环。
         return WRITE_STATUS_SNDBUF_FULL;
     }
 
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+        //配置最大循环写的次数是为了防止写的次数太多造成假死的现象。
         int writeSpinCount = config().getWriteSpinCount();
         do {
             Object msg = in.current();
@@ -260,7 +262,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             }
             writeSpinCount -= doWriteInternal(in, msg);
         } while (writeSpinCount > 0);
-
+        //只有出现ZERO_WINDOW时，writeSpinCount才会小于0.
         incompleteWrite(writeSpinCount < 0);
     }
 
@@ -283,6 +285,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 "unsupported message type: " + StringUtil.simpleClassName(msg) + EXPECTED_TYPES);
     }
 
+    //setOpWrite为true表示写半包。
     protected final void incompleteWrite(boolean setOpWrite) {
         // Did not write completely.
         if (setOpWrite) {
@@ -292,9 +295,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             // use our write quantum. In this case we no longer want to set the write OP because the socket is still
             // writable (as far as we know). We will find out next time we attempt to write if the socket is writable
             // and set the write OP if necessary.
+            // 尽可能在需要的时候再开启对写操作位，不然每次循环都会唤起。
             clearOpWrite();
 
             // Schedule flush again later so other tasks can be picked up in the meantime
+            // 启动独立的runnable进行半包消息的发送。flush操作实际调用的就是doWrite。
             eventLoop().execute(flushTask);
         }
     }
@@ -319,6 +324,8 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
      */
     protected abstract int doWriteBytes(ByteBuf buf) throws Exception;
 
+
+    //设置selectionKey的写标识，多路复用器会不断轮询对应的channel用于处理没有发送完成的半包信息，直到清除selectionKey的写操作位。这样就不要独立的线程来处理半包消息了。
     protected final void setOpWrite() {
         final SelectionKey key = selectionKey();
         // Check first if the key is still valid as it may be canceled as part of the deregistration
